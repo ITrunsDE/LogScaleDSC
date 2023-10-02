@@ -1,6 +1,14 @@
 {
-    "share": "\\\\it-runs.de\\netlogon",
-    "name": "Exchange",
-    "path_to_msi": "\\\\it-runs.de\\netlogon\\log-collector\\humio-log-collector_1.5.1_windows_amd64.msi",
-    "enrollmentToken": "eyJpbnN0YWxsVG9rZW4iOiIzUmdqS1RUVGwxMnc2SU45amJzQkNKOFRrUUc3bFdNcyIsInVybCI6Imh0dHBzOi8vY2xvdWQuY29tbXVuaXR5Lmh1bWlvLmNvbSJ9"
+    "dsc_share": "\\\\it-runs.de\\netlogon",
+    "installation_file": "\\\\it-runs.de\\netlogon\\log-collector\\humio-log-collector_1.5.1_windows_amd64.msi",
+    "sections": [
+        {
+            "name": "Exchange",
+            "enrollmentToken": "eyJpbnN0YWxsVG9rZW4iOiIzUmdqS1RUVGwxMnc2SU45amJzQkNKOFRrUUc3bFdNcyIsInVybCI6Imh0dHBzOi8vY2xvdWQuY29tbXVuaXR5Lmh1bWlvLmNvbSJ9"
+        },
+        {
+            "name": "Server",
+            "enrollmentToken": "eyJpbnN0YWxsVG9rZW4iOiIzUmdqS1RUVGwxMnc2SU45amJzQkNKOFRrUUc3bFdNcyIsInVybCI6Imh0dHBzOi8vY2xvdWQuY29tbXVuaXR5Lmh1bWlvLmNv1234"
+        }        
+    ]
 }
