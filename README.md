@@ -79,6 +79,6 @@ Das Powershell DSC Script wird beim Start des Computers aufgerufen. Um dieses zu
 
 In diesem Bereich kann im Tab **PowerShell Scripts** die Datei angegeben werden, die in dem Ordner GroupPolicy zu finden ist und der Section der Gruppenrichtlinie entspricht. Diese muss auch in den entsprechenden Ordner kopiert werden. Dieser kann über die Schaltfläche **Show Files** geöffnet werden.
 
-![screenshot](docs/GroupPolicy-Files.png)
+![screenshot](docs/GroupPolicy-Files.PNG)
 
 Anschließend kann die Gruppenrichtlinie zugewiesen werden und getestet werden. 
