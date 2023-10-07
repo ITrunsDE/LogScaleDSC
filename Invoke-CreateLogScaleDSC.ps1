@@ -24,7 +24,7 @@ Configuration InstallLogScaleCollector {
 
     Import-DscResource -ModuleName "PSDesiredStateConfiguration"
 
-    Node $Name {
+    Node localhost {
 
         Package LogscaleCollectorInstallation {
             Ensure    = "Present"
@@ -105,7 +105,7 @@ Configuration InstallLogScaleCollector {
 
                 # enroll client
                 Write-Verbose "Enroll client..."
-                Start-Process -FilePath $executePath -ArgumentList "enroll $($EnrollmentToken)" -Wait
+                Start-Process -FilePath $executePath -ArgumentList "enroll $($using:EnrollmentToken)" -Wait
 
             }
 
@@ -177,11 +177,12 @@ foreach ($section in $config.sections) {
     Write-Host -ForegroundColor Yellow $section.name
 
     Write-Host -ForegroundColor White "[-] => Create DSC configuration for section"
-    $output = InstallLogScaleCollector -Name $section.name -FilePath $config.installation_file -ProductId $ProductId -EnrollmentToken $section.enrollmentToken
+    $outputPath = Join-Path "DSC" $section.name
+    $output = InstallLogScaleCollector -Name $section.name -FilePath $config.installation_file -ProductId $ProductId -EnrollmentToken [string]$section.enrollmentToken -OutputPath $outputPath
 
     Write-Host -ForegroundColor White "[-] => Create Powershell start script"
     @"
-Start-DscConfiguration "$($config.dsc_share)\InstallLogScaleCollector" -ComputerName $($section.name) -Wait -Force
+Start-DscConfiguration "$($config.dsc_share)\$($outputPath)" -ComputerName $($section.name) -Wait -Force
 "@ | Out-File -FilePath "$($workingDir)\GroupPolicy\DSC_LogScale_$($section.name).ps1" -Force
     
     Write-Host -ForegroundColor White "[-] => Powershell start script is stored here: " -NoNewline 
@@ -195,7 +196,7 @@ Write-Host ""
 Write-Host -ForegroundColor White "The files are created for each section. Now you just have to create a group policy for each section and add the corresponding script in the Powershell Scripts section under Computer Configuration/Windows Settings/...."
 Write-Host ""
 Write-Host -ForegroundColor White "The folder " -NoNewLine
-Write-Host -ForegroundColor Yellow "InstallLogScaleCollector" -NoNewline
+Write-Host -ForegroundColor Yellow "DSC" -NoNewline
 Write-Host -ForegroundColor White " must be copied into the directory " -NoNewline
 Write-Host -ForegroundColor Yellow $config.dsc_share -NoNewline
 Write-Host "."
