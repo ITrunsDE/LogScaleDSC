@@ -108,13 +108,22 @@ Configuration InstallLogScaleCollector {
 
                 # enroll client
                 Write-Verbose "Enroll client..."
-                Start-Process -FilePath $executePath -ArgumentList "enroll $($using:EnrollmentToken)" -Wait
+                # Write-Verbose "Client: $($executePath)"
+                # Write-Verbose "EnrollmentToken: $($using:EnrollmentToken)"
+                # Write-Verbose "enroll $($using:EnrollmentToken)"
+                Start-Process -FilePath $executePath -ArgumentList "enroll $($using:EnrollmentToken)" -Wait -Verbose
 
             }
 
         }
-    }
-    
+
+        Service LogScaleService {
+            Name = "HumioLogCollector"
+            StartupType = "Automatic"
+            Ensure = "Present"
+            DependsOn = "[Script]CheckEnrolled"
+        }
+    }   
 }
 
 function Get-MsiInformation {
@@ -187,13 +196,13 @@ foreach ($section in $config.sections) {
 
     Write-Host -ForegroundColor White "[+] => Create DSC configuration " -NoNewline
     $outputPath = Join-Path "DSC" $section.name
-    $output = InstallLogScaleCollector -Name $section.name -FilePath $config.installation_file -ProductId $ProductId -EnrollmentToken [string]$section.enrollmentToken -OutputPath $outputPath
+    $output = InstallLogScaleCollector -Name $section.name -FilePath $config.installation_file -ProductId $ProductId -EnrollmentToken $($section.enrollmentToken) -OutputPath $outputPath
     #Write-Host -ForegroundColor White "[-] => DSC configuration stored here: " -NoNewline
     Write-Host -ForegroundColor Cyan "-" $outputPath
 
     Write-Host -ForegroundColor White "[+] => Create Powershell start script " -NoNewline
     @"
-Start-DscConfiguration "$($config.dsc_share)\$($outputPath)" -ComputerName $($section.name) -Wait -Force
+Start-DscConfiguration "$($config.dsc_share)\$($outputPath)" -Wait -Force
 "@ | Out-File -FilePath "$($workingDir)\GroupPolicy\DSC_LogScale_$($section.name).ps1" -Force
     
     #Write-Host -ForegroundColor White "[-] => Powershell start script is stored here: " -NoNewline 
