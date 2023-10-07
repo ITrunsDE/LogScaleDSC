@@ -6,6 +6,9 @@ Clear-Host
 $workingDir = Split-Path $MyInvocation.MyCommand.Path -Parent
 $config = Get-Content $(Join-Path $workingDir "config.json") -ErrorAction Stop | ConvertFrom-Json
 
+# Create folder if necessary 
+$null = New-Item "$($workingDir)\GroupPolicy" -ItemType Directory -ErrorAction SilentlyContinue
+
 Configuration InstallLogScaleCollector {
 
     param (
@@ -114,12 +117,17 @@ Configuration InstallLogScaleCollector {
     
 }
 
-function Get-MsiProductCode {
+function Get-MsiInformation {
     [CmdletBinding()]
     param (
         [Parameter(Mandatory = $true)]
         [string]
-        $Path
+        $Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]
+        $Type
+
     )
     
     begin {
@@ -130,7 +138,7 @@ function Get-MsiProductCode {
         try {
             $msiDatabase = $windowsInstaller.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $windowsInstaller, @($Path, 0))
             
-            $query = "SELECT Value FROM Property WHERE Property='ProductCode'"
+            $query = "SELECT Value FROM Property WHERE Property='$($Type)'"
             $view = $msiDatabase.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $msiDatabase, ($query))
             $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null)
             
@@ -142,10 +150,15 @@ function Get-MsiProductCode {
             } 
         }
         catch {
-            Write-Error "Fehler beim Lesen des ProductCode: $_"
+            Write-Error "Fehler beim Lesen des $($Type): $_"
         }  
     }
 }
+
+# get ProductId for comparing in DSC script
+[string] $ProductId = Get-MsiInformation -Path $config.installation_file -Type "ProductCode"
+[string] $ProductName = Get-MsiInformation -Path $config.installation_file -Type "ProductName"
+[string] $ProductVersion = Get-MsiInformation -Path $config.installation_file -Type "ProductVersion"
 
 Write-Host -ForegroundColor White ""
 Write-Host -ForegroundColor White "      ___                                  ___  "
@@ -156,37 +169,35 @@ Write-Host -ForegroundColor White "    "
 Write-Host -ForegroundColor White "    (c) 2023 - Sebastian Selig - mylogscale.com"
 Write-Host -ForegroundColor White ""
 Write-Host -ForegroundColor White ""
-Write-Host -ForegroundColor White "[-] Config: " -NoNewline 
+Write-Host -ForegroundColor White "[i] Using Config file: " -NoNewline 
 Write-Host -ForegroundColor Yellow $(Join-Path $workingDir "config.json")
-Write-Host -ForegroundColor White "[-] Start compiling DSC with the following parameters..."
+Write-Host -ForegroundColor White "[+] Start compiling DSC with the following parameters..."
 Write-Host ""
-Write-Host -ForegroundColor White "[-] Using installation file: " -NoNewline 
+Write-Host -ForegroundColor White "[i] Using installation file: " -NoNewline 
 Write-Host -ForegroundColor Yellow $config.installation_file
+Write-Host -ForegroundColor White "[i] Found:" -NoNewline 
+Write-Host -ForegroundColor Yellow "$ProductName $($ProductVersion.Trim())"
 Write-Host ""
 
 #########################################################################################
-# Create folder if necessary 
-$null = New-Item "$($workingDir)\GroupPolicy" -ItemType Directory -ErrorAction SilentlyContinue
-
-# get ProductId for comparing in DSC script
-[string] $ProductId = Get-MsiProductCode -Path $config.installation_file
-
 foreach ($section in $config.sections) {
     
-    Write-Host -ForegroundColor White "[-] Section: " -NoNewline
+    Write-Host -ForegroundColor White "[i] Section: " -NoNewline
     Write-Host -ForegroundColor Yellow $section.name
 
-    Write-Host -ForegroundColor White "[-] => Create DSC configuration for section"
+    Write-Host -ForegroundColor White "[+] => Create DSC configuration " -NoNewline
     $outputPath = Join-Path "DSC" $section.name
     $output = InstallLogScaleCollector -Name $section.name -FilePath $config.installation_file -ProductId $ProductId -EnrollmentToken [string]$section.enrollmentToken -OutputPath $outputPath
+    #Write-Host -ForegroundColor White "[-] => DSC configuration stored here: " -NoNewline
+    Write-Host -ForegroundColor Cyan "-" $outputPath
 
-    Write-Host -ForegroundColor White "[-] => Create Powershell start script"
+    Write-Host -ForegroundColor White "[+] => Create Powershell start script " -NoNewline
     @"
 Start-DscConfiguration "$($config.dsc_share)\$($outputPath)" -ComputerName $($section.name) -Wait -Force
 "@ | Out-File -FilePath "$($workingDir)\GroupPolicy\DSC_LogScale_$($section.name).ps1" -Force
     
-    Write-Host -ForegroundColor White "[-] => Powershell start script is stored here: " -NoNewline 
-    Write-Host -ForegroundColor Cyan "$($workingDir)\DSC_LogScale_$($section.name).ps1"
+    #Write-Host -ForegroundColor White "[-] => Powershell start script is stored here: " -NoNewline 
+    Write-Host -ForegroundColor Cyan "- GroupPolicy\DSC_LogScale_$($section.name).ps1"
     Write-Host ""
 
 }
