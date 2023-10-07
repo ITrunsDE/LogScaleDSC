@@ -1,3 +1,7 @@
+param (
+    [switch]$UseSigning
+)
+
 #Requires -Version 5.0
 [float] $version = 0.2
 
@@ -118,10 +122,10 @@ Configuration InstallLogScaleCollector {
         }
 
         Service LogScaleService {
-            Name = "HumioLogCollector"
+            Name        = "HumioLogCollector"
             StartupType = "Automatic"
-            Ensure = "Present"
-            DependsOn = "[Script]CheckEnrolled"
+            Ensure      = "Present"
+            DependsOn   = "[Script]CheckEnrolled"
         }
     }   
 }
@@ -154,6 +158,45 @@ Write-Host -ForegroundColor White "[i] Found:" -NoNewline
 Write-Host -ForegroundColor Yellow "$ProductName $($ProductVersion.Trim())"
 Write-Host ""
 
+# get signing certificate
+$signCert = Get-SigningCertificate
+$signScripts = $false
+if ($UseSigning -and $signCert) {
+    $signScripts = $true
+    Write-Host -ForegroundColor White "[i] Using this certificate for the signature"
+    Write-Host -ForegroundColor White "[+] => Thumbprint: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.Thumbprint
+    Write-Host -ForegroundColor White "[+] => Subject: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.Subject
+    Write-Host -ForegroundColor White "[+] => Issuer: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.Issuer
+    Write-Host -ForegroundColor White "[+] => Valid until: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.NotAfter
+    Write-Host -ForegroundColor White "[+] => Friendly name: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.FriendlyName
+    Write-Host ""
+}
+elseif ($UseSigning) {
+    Write-Host -ForegroundColor Red "[e] No code signing certificate found"
+    Write-Host ""
+}
+elseif ($signCert) {
+    Write-Host -ForegroundColor White "[i] Found a signing certificate"
+    Write-Host -ForegroundColor White "[+] => Thumbprint: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.Thumbprint
+    Write-Host -ForegroundColor White "[+] => Subject: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.Subject
+    Write-Host -ForegroundColor White "[+] => Issuer: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.Issuer
+    Write-Host -ForegroundColor White "[+] => Valid until: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.NotAfter
+    Write-Host -ForegroundColor White "[+] => Friendly name: " -NoNewline
+    Write-Host -ForegroundColor Yellow $signCert.FriendlyName
+    Write-Host -ForegroundColor DarkGreen "[i] To use this signing certificate run again with " -NoNewline
+    Write-Host -ForegroundColor Cyan "-UseSigning"
+    Write-Host ""
+}
+
 #########################################################################################
 foreach ($section in $config.sections) {
     
@@ -162,17 +205,28 @@ foreach ($section in $config.sections) {
 
     Write-Host -ForegroundColor White "[+] => Create DSC configuration " -NoNewline
     $outputPath = Join-Path "DSC" $section.name
-    $output = InstallLogScaleCollector -Name $section.name -FilePath $config.installation_file -ProductId $ProductId -EnrollmentToken $($section.enrollmentToken) -OutputPath $outputPath
-    #Write-Host -ForegroundColor White "[-] => DSC configuration stored here: " -NoNewline
+    $null = InstallLogScaleCollector -Name $section.name -FilePath $config.installation_file -ProductId $ProductId -EnrollmentToken $($section.enrollmentToken) -OutputPath $outputPath
     Write-Host -ForegroundColor Cyan "-" $outputPath
 
-    Write-Host -ForegroundColor White "[+] => Create Powershell start script " -NoNewline
+    # sign the DSC files with the code signing certificate
+    if ($signScripts) {
+        Write-Host -ForegroundColor White "[+] => Sign DSC configuration"
+        $null = Set-AuthenticodeSignature "$($outputPath)\localhost.mof" $signCert
+    }
+
+    Write-Host -ForegroundColor White "[+] => Create PowerShell start script " -NoNewline
     @"
 Start-DscConfiguration "$($config.dsc_share)\$($outputPath)" -Wait -Force
 "@ | Out-File -FilePath "$($workingDir)\GroupPolicy\DSC_LogScale_$($section.name).ps1" -Force
     
-    #Write-Host -ForegroundColor White "[-] => Powershell start script is stored here: " -NoNewline 
     Write-Host -ForegroundColor Cyan "- GroupPolicy\DSC_LogScale_$($section.name).ps1"
+    
+    # sign the scripts with the code signing certificate
+    if ($signScripts) {
+        Write-Host -ForegroundColor White "[+] => Sign PowerShell start script with certificate"
+        $null = Set-AuthenticodeSignature "$($workingDir)\GroupPolicy\DSC_LogScale_$($section.name).ps1" $signCert
+    }
+    
     Write-Host ""
 
 }

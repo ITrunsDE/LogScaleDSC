@@ -36,4 +36,9 @@ function Get-MsiInformation {
     }
 }
 
+function Get-SigningCertificate {
+    return Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object -First 1 -Property Thumbprint, Subject, Issuer, NotAfter, FriendlyName
+}
+
+
 Export-ModuleMember -Function *
