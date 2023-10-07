@@ -1,13 +1,13 @@
 #Requires -Version 5.0
-[float] $version = 0.1
+[float] $version = 0.2
 
 Clear-Host
-# load config file
-$workingDir = Split-Path $MyInvocation.MyCommand.Path -Parent
-$config = Get-Content $(Join-Path $workingDir "config.json") -ErrorAction Stop | ConvertFrom-Json
 
-# Create folder if necessary 
-$null = New-Item "$($workingDir)\GroupPolicy" -ItemType Directory -ErrorAction SilentlyContinue
+# load module and configuration file
+$workingDir = Split-Path $MyInvocation.MyCommand.Path -Parent
+Import-Module $(Join-Path $workingDir "LogScaleDSC.psm1")
+
+$config = Get-Content $(Join-Path $workingDir "config.json") -ErrorAction Stop | ConvertFrom-Json
 
 Configuration InstallLogScaleCollector {
 
@@ -126,43 +126,9 @@ Configuration InstallLogScaleCollector {
     }   
 }
 
-function Get-MsiInformation {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $true)]
-        [string]
-        $Path,
-
-        [Parameter(Mandatory = $true)]
-        [string]
-        $Type
-
-    )
-    
-    begin {
-        $windowsInstaller = New-Object -ComObject WindowsInstaller.Installer
-    }
-    
-    process {
-        try {
-            $msiDatabase = $windowsInstaller.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $windowsInstaller, @($Path, 0))
-            
-            $query = "SELECT Value FROM Property WHERE Property='$($Type)'"
-            $view = $msiDatabase.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $msiDatabase, ($query))
-            $view.GetType().InvokeMember("Execute", "InvokeMethod", $null, $view, $null)
-            
-            $record = $view.GetType().InvokeMember("Fetch", "InvokeMethod", $null, $view, $null)
-            $productCode = $record.GetType().InvokeMember("StringData", "GetProperty", $null, $record, 1)
-        
-            if ($null -ne $productCode) {
-                return [string] $productCode.Replace("{", "").Replace("}", "").Trim()
-            } 
-        }
-        catch {
-            Write-Error "Fehler beim Lesen des $($Type): $_"
-        }  
-    }
-}
+# Create folder if necessary 
+$null = New-Item "$($workingDir)\DSC" -ItemType Directory -ErrorAction SilentlyContinue
+$null = New-Item "$($workingDir)\GroupPolicy" -ItemType Directory -ErrorAction SilentlyContinue
 
 # get ProductId for comparing in DSC script
 [string] $ProductId = Get-MsiInformation -Path $config.installation_file -Type "ProductCode"
